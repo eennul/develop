@@ -57,13 +57,13 @@ dat.major <- do.call(cbind,dat.zoo.list)
 colnames(dat.major) <- paste0(column.names)
 head(dat.major)
 
-# start & end period 
+# start & end period preview
 start(dat.major)
 end(dat.major)
 
 # subset specific time period
 window(dat.major, start=as.POSIXct("2015-05-04 14:26:00"), end=as.POSIXct("2015-05-04 14:28:00"))
 
-# # plot data
+# # plot data 
 # plot(dat.major)
 
