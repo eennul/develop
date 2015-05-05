@@ -1,0 +1,69 @@
+library(IBrokers)
+
+# connect to IB api when logged into TWS 
+tws <- twsConnect()
+
+# check connection
+reqCurrentTime(tws)
+
+# major currency pairs
+major.pair1 <- c("EUR","AUD","GBP","USD","EUR","EUR","USD","USD")
+major.pair2 <- c("USD","USD","USD","JPY","JPY","GBP","CAD","CHF")
+
+# more fx pairs 
+
+# europa.fx <- data.frame(c("EUR","AUD"),c("EUR","CHF"),c("EUR","CAD),c("EUR","NZD),
+#                         c("GBP","AUD"),c("GBP","CAD"),c("GBP","CHF"),c("GBP","NZD"),c("CAD","CHF"))
+# 
+# 
+# japan.fx <- data.frame(c("EUR","JPY"),c("CHF","JPY"),c("CAD","JPY"),c("NZD","JPY"),  	
+#                        c("GBP","JPY"),c("AUD","JPY"),c("SGD","JPY"),c("ZAR","JPY"))	
+# 	
+# 
+# asia.pacific.fx <- data.frame(c("USD","CNH"),c("AUD","NZD"),c("AUD","CAD"),c("NZD","CAD"),	
+#                               c("NZD","USD"),c("AUD","CHF"),c("NZD","CHF"),c("USD","HKD"),
+#                               c("USD","SGD"))
+
+####################################################################################################################
+######################## Download data  ############################################################################
+####################################################################################################################
+
+
+for(i in seq_along(major.pair1)){
+    rHist <- list()
+    rHist[[i]] <- reqHistoricalData(tws, Contract=twsCurrency(major.pair1[i],major.pair2[i]), useRTH='1', 
+                                 whatToShow='MIDPOINT', barSize = "1 min", duration = "1 W")
+    write.csv(data.frame(rHist[[i]]), file=paste("Z:/R/IB_github/dataIB_",i,".csv"), row.names = TRUE)   
+    Sys.sleep(10) # mandatory 10s between request to avoid IB pacing violation
+ }
+
+# close connection
+close(tws)
+
+# here ready data as list
+data.files <- lapply(Sys.glob("Z:/R/IB_github/dataIB*.csv"), read.csv)
+
+####################################################################################################################
+######################## Time series - cleaning ####################################################################
+####################################################################################################################
+
+require(zoo) # for non equal spaced time series handling  
+
+dat.zoo.list <- lapply(1:length(data.files), function(i) zoo(data.files[[i]][ ,5], order.by=as.POSIXct(data.files[[i]]$X))) 
+column.names <- lapply(lapply(data.files, function(x) colnames(x)), function(x) x[5])
+
+# column bind relevant data 
+dat.major <- do.call(cbind,dat.zoo.list)
+colnames(dat.major) <- paste0(column.names)
+head(dat.major)
+
+# start & end period 
+start(dat.major)
+end(dat.major)
+
+# subset specific time period
+window(dat.major, start=as.POSIXct("2015-05-04 14:26:00"), end=as.POSIXct("2015-05-04 14:28:00"))
+
+# # plot data
+# plot(dat.major)
+
