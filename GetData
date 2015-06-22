@@ -68,3 +68,33 @@ window(dat.major, start=as.POSIXct("2015-05-04 14:26:00"), end=as.POSIXct("2015-
 # # plot data 
 # plot(dat.major)
 
+
+####################################################################################################################
+######################## Download data with higher freq (1min)  ####################################################
+####################################################################################################################
+
+# 3 month data; extracted as daily with 1min interval 
+
+freq <- c("1 min")
+
+# daily data
+for(i in seq_along(cc.days.format)){
+  rHist <- list()      
+  for(j in seq_along(major.pair1)){
+    rHist[[j]] <- reqHistoricalData(tws, endDateTime=cc.days.format[i], Contract=twsCurrency(major.pair1[j],major.pair2[j]), useRTH='1', 
+                                    whatToShow='MIDPOINT', barSize = freq[1], duration = "1 D")
+    Sys.sleep(10)
+  }
+  write.csv(data.frame(do.call(cbind, rHist)), file=paste("Z:/R/IB_github/data/by_day_duration_3M_1min/dataIB_",i,".csv"), row.names = TRUE)   
+  gc()
+} 
+
+market.data <- lapply(Sys.glob("Z:/R/IB_github/data/by_min_duration_3M/dataIB*.csv"), read.csv)
+
+# require(zoo) # for non equal spaced time series handling  
+dat.zoo.list <- lapply(1:length(market.data), function(i) zoo(market.data[[i]], order.by=as.POSIXct(market.data[[i]]$X))) 
+dat.major <- lapply(dat.zoo.list, function(x) subset(x, select=c(EUR.USD.Close,AUD.USD.Close,GBP.USD.Close,USD.JPY.Close,
+                                                                 EUR.GBP.Close,EUR.JPY.Close,USD.CAD.Close,USD.CHF.Close)))
+market.data.all <- do.call(rbind, dat.major)
+head(market.data.all)
+
