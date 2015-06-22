@@ -75,6 +75,16 @@ window(dat.major, start=as.POSIXct("2015-05-04 14:26:00"), end=as.POSIXct("2015-
 
 # 3 month data; extracted as daily with 1min interval 
 
+library(lubridate)
+
+startdate <- Sys.Date() - months(3)
+# startdate <- floor_date(Sys.Date() - months(3), "month") # or start of the month 
+
+day.dates <- seq(startdate, by="1 day", length.out=90)
+dat.days <- day.dates[wday(day.dates) != 1 & wday(day.dates) != 7]
+# trad.days <- format(as.POSIXct(as.Date(dat.days)), tz="America/Los_Angeles",usetz=TRUE)
+cc.days.format <- strftime(dat.days,format="%Y%m%d %H:%M %Z") 
+
 freq <- c("1 min")
 
 # daily data
