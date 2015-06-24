@@ -1,5 +1,7 @@
 
 
+
+
 ####################################################################################################################
 ######################## Upload data  ##############################################################################
 ####################################################################################################################
@@ -19,22 +21,29 @@ week.total <- do.call(rbind, dat.major)
 ################################### model estim dlm ################################################################
 ####################################################################################################################
 
-sample.size <- round(nrow(week.total)/3,-1)
+sample.size <- round(nrow(week.total)*0.5,-1) # estim.dat sample size length
 
 # in-sample data 
-subData <- window(week.total, start=as.POSIXct(time(week.total)[1]), 
+subData1 <- window(week.total, start=as.POSIXct(time(week.total)[1]), 
+                  end=as.POSIXct(time(week.total)[sample.size]))
+subData2 <- window(week.total, start=as.POSIXct(time(week.total)[sample.size/3]), # shorter estim.dat sample data
+                  end=as.POSIXct(time(week.total)[sample.size]))
+subData3 <- window(week.total, start=as.POSIXct(time(week.total)[sample.size/2]), # shorter estim.dat sample data
                   end=as.POSIXct(time(week.total)[sample.size]))
 
 # out-of-sample data
-subData1 <- window(week.total, start=as.POSIXct(time(week.total)[sample.size]), 
+subData_out <- window(week.total, start=as.POSIXct(time(week.total)[sample.size]), 
                    end=as.POSIXct(tail(time(week.total),1)))
 
 ###############################################################################################################
 
 # choose fx pair
 
-estim.dat <- subData$EUR.GBP.Close
-valid.dat <- subData1$EUR.GBP.Close
+estim.dat.1 <- subData1$EUR.GBP.Close
+estim.dat.2 <- subData2$EUR.GBP.Close
+estim.dat.3 <- subData3$EUR.GBP.Close
+
+valid.dat <- subData_out$EUR.GBP.Close
 whole.dat <- week.total$EUR.GBP.Close
 
 ###############################################################################################################
@@ -47,27 +56,42 @@ dlm.model <- function(x) {
   dlm.poly <- dlmModPoly(order=1, dV=exp(x[1]), dW=exp(x[2]), m0=x[1])
   return(dlm.poly) }
 
-dlm.mle.par <- suppressWarnings(dlmMLE(estim.dat, method="BFGS", rep(0, 2), dlm.model))
-dlm.para <- unlist(dlm.model(dlm.mle.par$par)[c("V","W")])
-fit.model <- dlm.model(dlm.mle.par$par)
-modFilt  <-  dlmFilter(estim.dat, fit.model)
+dlm.mle.par.1 <- suppressWarnings(dlmMLE(estim.dat.1, method="BFGS", rep(0, 2), dlm.model))
+dlm.para.1 <- unlist(dlm.model(dlm.mle.par.1$par)[c("V","W")])
+fit.model.1 <- dlm.model(dlm.mle.par.1$par)
+
+dlm.mle.par.2 <- suppressWarnings(dlmMLE(estim.dat.2, method="BFGS", rep(0, 2), dlm.model))
+dlm.para.2 <- unlist(dlm.model(dlm.mle.par.2$par)[c("V","W")])
+fit.model.2 <- dlm.model(dlm.mle.par.2$par)
+
+dlm.mle.par.3 <- suppressWarnings(dlmMLE(estim.dat.3, method="BFGS", rep(0, 2), dlm.model))
+dlm.para.3 <- unlist(dlm.model(dlm.mle.par.3$par)[c("V","W")])
+fit.model.3 <- dlm.model(dlm.mle.par.3$par)
 
 ###############################################################################################################
 
-n.ahead.1 <- round(nrow(week.total),-1)   # n step ahead forecast
-n.ahead.2 <- round(nrow(week.total)/2,-1) 
-n.ahead.3 <- round(nrow(week.total)/3,-1)
+# 3 ranges of estim.dat 
+
+modFilt.1  <-  dlmFilter(estim.dat.1, fit.model.1)
+modFilt.2  <-  dlmFilter(estim.dat.2, fit.model.2)
+modFilt.3  <-  dlmFilter(estim.dat.3, fit.model.3)
+
+###############################################################################################################
+
+n.ahead.1 <- round(length(valid.dat),-1)   # n step ahead forecast
+n.ahead.2 <- round(length(valid.dat)/2,-1) 
+n.ahead.3 <- round(length(valid.dat)/3,-1)
 
 num.simul <- 10 # number of simulations 
 
-mForecast1 <- dlmForecast(modFilt, nAhead = n.ahead.1, sampleNew = num.simul)
-mForecast2 <- dlmForecast(modFilt, nAhead = n.ahead.2, sampleNew = num.simul)
-mForecast3 <- dlmForecast(modFilt, nAhead = n.ahead.3, sampleNew = num.simul)
+mForecast1 <- dlmForecast(modFilt.1, nAhead = n.ahead.1, sampleNew = num.simul)
+mForecast2 <- dlmForecast(modFilt.2, nAhead = n.ahead.2, sampleNew = num.simul)
+mForecast3 <- dlmForecast(modFilt.3, nAhead = n.ahead.3, sampleNew = num.simul)
 
 # plot realized observ. (estim.dat) in-sample data 
-plot(window(whole.dat, start=as.POSIXct(start(estim.dat)), end=as.POSIXct(time(whole.dat[length(estim.dat)]))), type = 'o',
+plot(window(whole.dat, start=as.POSIXct(start(estim.dat.1)), end=as.POSIXct(time(whole.dat[length(estim.dat.1)]))), type = 'o',
      xlim = c(as.POSIXct(start(whole.dat)), as.POSIXct(end(whole.dat))), 
-     ylim = c(as.numeric(min(estim.dat))*0.99, as.numeric(max(estim.dat))*1.01), xlab = "Time", ylab = "Price")
+     ylim = c(as.numeric(min(estim.dat.1))*0.99, as.numeric(max(estim.dat.1))*1.01), xlab = "Time", ylab = "Price")
 
 # future realized values (out-of-sample dataset) 
 future.real <- window(whole.dat, start=as.POSIXct(time(head(valid.dat,1))), end=as.POSIXct(time(tail(valid.dat,1))))
@@ -81,7 +105,7 @@ sim.states.1 <- lapply(1:length(mForecast1$newObs), function(i) zoo(mForecast1$n
 sim.median.day.1 <- lapply(sim.states.1, function(x) aggregate(x, as.POSIXct(trunc(time(x), "days")), median))
 
 sim.dat.1 <- do.call(cbind, sim.median.day.1); colnames(sim.dat.1) <- paste0("X",1:ncol(sim.dat.1)) # bind list
-sim.med.1 <- apply(sim.dat.1,1,median) # calculate median across simulated columns 
+sim.med.1 <- apply(sim.dat.1,1,mean) # calculate median across simulated columns 
 med.dat.ts.1 <- read.zoo(data.frame(date=as.POSIXct(names(sim.med.1)), fx=as.numeric(sim.med.1))) # convert to zoo series
 
 expect.future.obs.1 <- zoo(mForecast1$f, order.by=as.POSIXct(time(head(valid.dat,n.ahead.1))))
@@ -94,7 +118,7 @@ sim.states.2 <- lapply(1:length(mForecast2$newObs), function(i) zoo(mForecast2$n
 sim.median.day.2 <- lapply(sim.states.2, function(x) aggregate(x, as.POSIXct(trunc(time(x), "days")), median))
 
 sim.dat.2 <- do.call(cbind, sim.median.day.2); colnames(sim.dat.2) <- paste0("X",1:ncol(sim.dat.2)) # bind list
-sim.med.2 <- apply(sim.dat.2,1,median) # calculate median across simulated columns 
+sim.med.2 <- apply(sim.dat.2,1,mean) # calculate median across simulated columns 
 med.dat.ts.2 <- read.zoo(data.frame(date=as.POSIXct(names(sim.med.2)), fx=as.numeric(sim.med.2))) # convert to zoo series
 
 expect.future.obs.2 <- zoo(mForecast2$f, order.by=as.POSIXct(time(head(valid.dat,n.ahead.2))))
@@ -107,7 +131,7 @@ sim.states.3 <- lapply(1:length(mForecast3$newObs), function(i) zoo(mForecast3$n
 sim.median.day.3 <- lapply(sim.states.3, function(x) aggregate(x, as.POSIXct(trunc(time(x), "days")), median))
 
 sim.dat.3 <- do.call(cbind, sim.median.day.3); colnames(sim.dat.3) <- paste0("X",1:ncol(sim.dat.3)) # bind list
-sim.med.3 <- apply(sim.dat.3,1,median) # calculate median across simulated columns 
+sim.med.3 <- apply(sim.dat.3,1,mean) # calculate median across simulated columns 
 med.dat.ts.3 <- read.zoo(data.frame(date=as.POSIXct(names(sim.med.3)), fx=as.numeric(sim.med.3))) # convert to zoo series
 
 expect.future.obs.3 <- zoo(mForecast3$f, order.by=as.POSIXct(time(head(valid.dat,n.ahead.3))))
